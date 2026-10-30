@@ -83,26 +83,17 @@ class ArenaScene extends Phaser.Scene {
     this._moveInterval = null;
   }
 
-  // ── Preload: load all char sprites + atlases ────────────────────────────────
+  // ── Preload: fallback if LoadingScene was skipped ──────────────────────────
   preload() {
     const colors = ['Blue', 'Pink', 'Yellow', 'Green', 'Beige'];
     const poses = ['front', 'walk1', 'walk2', 'stand', 'hit', 'jump', 'duck'];
     colors.forEach(c => poses.forEach(p => {
       const key = `alien${c}_${p}`;
-      if (!this.textures.exists(key)) {
-        this.load.image(key, `/assets/chars/alien${c}_${p}.png`);
-      }
+      if (!this.textures.exists(key)) this.load.image(key, `/assets/chars/alien${c}_${p}.png`);
     }));
-
-    if (!this.textures.exists('bg_colored')) {
-      this.load.image('bg_colored', '/assets/bg/colored_land.png');
-    }
-    if (!this.textures.exists('tiles')) {
-      this.load.atlasXML('tiles', '/assets/tiles/spritesheet_tiles.png', '/assets/tiles/spritesheet_tiles.xml');
-    }
-    if (!this.textures.exists('items')) {
-      this.load.atlasXML('items', '/assets/items/spritesheet_items.png', '/assets/items/spritesheet_items.xml');
-    }
+    if (!this.textures.exists('bg_colored')) this.load.image('bg_colored', '/assets/bg/colored_land.png');
+    if (!this.textures.exists('tiles')) this.load.atlasXML('tiles', '/assets/tiles/spritesheet_tiles.png', '/assets/tiles/spritesheet_tiles.xml');
+    if (!this.textures.exists('items')) this.load.atlasXML('items', '/assets/items/spritesheet_items.png', '/assets/items/spritesheet_items.xml');
   }
 
   // ── Draw arena = background + border ─────────────────────────────────────
@@ -650,9 +641,7 @@ class PenguinAttackScene extends ArenaScene {
 
   preload() {
     super.preload();
-    if (!this.textures.exists('enemies')) {
-      this.load.atlas('enemies', '/assets/enemies/spritesheet_enemies.png', '/assets/enemies/spritesheet_enemies.xml');
-    }
+    if (!this.textures.exists('enemies')) this.load.atlasXML('enemies', '/assets/enemies/spritesheet_enemies.png', '/assets/enemies/spritesheet_enemies.xml');
   }
 
   // ── Arctic environment with mountains, aurora, snowflakes ─────────────────
@@ -986,6 +975,56 @@ class MagmaMadnessScene extends ArenaScene {
   }
 }
 
+// ─── Loading Scene ────────────────────────────────────────────────────────────
+
+class LoadingScene extends Phaser.Scene {
+  constructor() { super({ key: 'Loading' }); }
+
+  preload() {
+    const W = gameData.arenaW, H = gameData.arenaH;
+
+    // ── Loading screen ──
+    const bg = this.add.rectangle(W/2, H/2, W, H, 0x0a0500, 1);
+    const title = this.add.text(W/2, H/2 - 60, 'BLOBZ', {
+      fontSize: '64px', fontFamily: 'Fredoka One, sans-serif',
+      color: '#fff8e7', stroke: '#5C3A1E', strokeThickness: 6,
+    }).setOrigin(0.5);
+    const loadingTxt = this.add.text(W/2, H/2 + 10, 'Lade Assets…', {
+      fontSize: '18px', fontFamily: 'Fredoka One, sans-serif', color: '#c4a882',
+    }).setOrigin(0.5);
+
+    // Progress bar track
+    const barBg = this.add.rectangle(W/2, H/2 + 50, 320, 22, 0x3d2010, 1);
+    const barFill = this.add.rectangle(W/2 - 159, H/2 + 50, 2, 18, 0xf59e0b, 1).setOrigin(0, 0.5);
+
+    this.load.on('progress', v => {
+      barFill.width = Math.max(2, v * 318);
+      loadingTxt.setText(`Lade… ${Math.round(v * 100)}%`);
+    });
+
+    // ── All assets ──
+    const colors = ['Blue', 'Pink', 'Yellow', 'Green', 'Beige'];
+    const poses = ['front', 'walk1', 'walk2', 'stand', 'hit', 'jump', 'duck'];
+    colors.forEach(c => poses.forEach(p => {
+      this.load.image(`alien${c}_${p}`, `/assets/chars/alien${c}_${p}.png`);
+    }));
+    this.load.image('bg_colored', '/assets/bg/colored_land.png');
+    this.load.atlasXML('tiles', '/assets/tiles/spritesheet_tiles.png', '/assets/tiles/spritesheet_tiles.xml');
+    this.load.atlasXML('items', '/assets/items/spritesheet_items.png', '/assets/items/spritesheet_items.xml');
+  }
+
+  create() {
+    const W = gameData.arenaW, H = gameData.arenaH;
+    this.add.text(W/2, H/2 + 10, 'Fertig! Starte…', {
+      fontSize: '18px', fontFamily: 'Fredoka One, sans-serif', color: '#5abf6a',
+    }).setOrigin(0.5);
+    this.time.delayedCall(400, () => {
+      this.scene.stop('Loading');
+      launchGame(gameData.game || 'bullet_barrage');
+    });
+  }
+}
+
 // ─── Score screen ─────────────────────────────────────────────────────────────
 
 const RANK_EMOJIS = ['🥇', '🥈', '🥉', '4.', '5.', '6.', '7.', '8.'];
@@ -1011,6 +1050,7 @@ function showScoreScreen(scores) {
 
 const SCENE_KEYS = { bullet_barrage: 'BulletBarrage', penguin_attack: 'PenguinAttack', magma_madness: 'MagmaMadness' };
 
+game.scene.add('Loading', LoadingScene, false);
 game.scene.add('BulletBarrage', BulletBarrageScene, false);
 game.scene.add('PenguinAttack', PenguinAttackScene, false);
 game.scene.add('MagmaMadness', MagmaMadnessScene, false);
@@ -1021,4 +1061,4 @@ function launchGame(gameName) {
 }
 
 if (gameData.myId !== 'solo') connectSocket();
-launchGame(gameData.game || 'bullet_barrage');
+game.scene.start('Loading');
