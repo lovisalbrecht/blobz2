@@ -173,9 +173,13 @@ class ArenaScene extends Phaser.Scene {
     if (!p) return;
     p.x = x; p.y = y;
 
-    // Walk animation
-    p.walkTimer += 16;
-    if (p.walkTimer > 200) { p.walkTimer = 0; p.walkFrame = 1 - p.walkFrame; }
+    // Walk animation using real scene time
+    const now = this.time.now;
+    if (!p._lastWalkFlip) p._lastWalkFlip = now;
+    if (now - p._lastWalkFlip > 200) {
+      p._lastWalkFlip = now;
+      p.walkFrame = 1 - p.walkFrame;
+    }
     const pose = moving ? (p.walkFrame === 0 ? 'walk1' : 'walk2') : 'stand';
     const key = `alien${p.char}_${pose}`;
     if (this.textures.exists(key)) p.sprite.setTexture(key);
@@ -359,6 +363,7 @@ class BulletBarrageScene extends ArenaScene {
 
     this._bulletGfx = this.add.graphics().setDepth(3);
     this._bullets = [];
+    this._bulletTrails = new Map();
 
     // Title
     const title = this.add.text(gameData.arenaW/2, gameData.arenaH/2 - 30, 'BULLET BARRAGE', {
@@ -386,20 +391,34 @@ class BulletBarrageScene extends ArenaScene {
   _soloTick() {
     const elapsed = Date.now() - this._soloStart;
     const now = Date.now();
-    if (now - this._lastSpawn > Math.max(300, 1200 - elapsed * 0.04)) {
+    const ramp = Math.max(0, elapsed - 10000);
+    const spawnInterval = Math.max(500, 4000 - ramp * 0.09);
+
+    if (now - this._lastSpawn > spawnInterval) {
       this._lastSpawn = now;
       const side = Math.floor(Math.random() * 4);
-      const speed = 200 + Math.random() * 100;
-      const r = 8 + Math.random() * 8;
+      const cappedSpeed = Math.min(280, 80 + ramp * 0.003);
+      const rand = Math.random();
+      let r, speed, color;
+      if (elapsed > 40000 && rand < 0.25) {
+        r = 6; speed = cappedSpeed * 1.6 + Math.random() * 40; color = 0xffffff;
+      } else if (elapsed > 20000 && rand < 0.2) {
+        r = 18; speed = cappedSpeed * 0.55 + Math.random() * 20; color = 0xff2200;
+      } else {
+        r = 10 + Math.random() * 6; speed = cappedSpeed + Math.random() * 35;
+        const cols = [0xff4444, 0xff8800, 0x44ffff, 0xff44ff, 0x44ff88];
+        color = cols[Math.floor(Math.random() * cols.length)];
+      }
+      const drift = (Math.random() - 0.5) * 50;
       let x, y, vx, vy;
       switch(side) {
-        case 0: x = Math.random()*gameData.arenaW; y = -r; vx = (Math.random()-.5)*80; vy = speed; break;
-        case 1: x = gameData.arenaW+r; y = Math.random()*gameData.arenaH; vx = -speed; vy = (Math.random()-.5)*80; break;
-        case 2: x = Math.random()*gameData.arenaW; y = gameData.arenaH+r; vx = (Math.random()-.5)*80; vy = -speed; break;
-        default: x = -r; y = Math.random()*gameData.arenaH; vx = speed; vy = (Math.random()-.5)*80;
+        case 0: x = Math.random()*gameData.arenaW; y = -r-10; vx = drift; vy = speed; break;
+        case 1: x = gameData.arenaW+r+10; y = Math.random()*gameData.arenaH; vx = -speed; vy = drift; break;
+        case 2: x = Math.random()*gameData.arenaW; y = gameData.arenaH+r+10; vx = drift; vy = -speed; break;
+        default: x = -r-10; y = Math.random()*gameData.arenaH; vx = speed; vy = drift;
       }
-      const colors = [0xff4444, 0xff8800, 0xffff00, 0x44ffff, 0xff44ff];
-      this._bullets.push({ x, y, vx, vy, r, color: colors[Math.floor(Math.random()*5)] });
+      const bid = this._soloNextId = (this._soloNextId || 0) + 1;
+      this._bullets.push({ id: bid, x, y, vx, vy, r, color });
     }
 
     const dt = 0.05;
@@ -409,7 +428,7 @@ class BulletBarrageScene extends ArenaScene {
     if (this.myAlive) {
       this._bullets.forEach(b => {
         const dx = this.myX - b.x, dy = this.myY - b.y;
-        if (dx*dx + dy*dy < (PLAYER_R + b.r)**2) this.killPlayerVFX(gameData.myId);
+        if (dx*dx + dy*dy < (13 + b.r * 0.75)**2) this.killPlayerVFX(gameData.myId);
       });
     }
 
@@ -427,18 +446,61 @@ class BulletBarrageScene extends ArenaScene {
 
   _renderBullets(bullets) {
     if (!this._bulletGfx) return;
-    this._bulletGfx.clear();
+    const gfx = this._bulletGfx;
+    gfx.clear();
+
+    const activeIds = new Set(bullets.map(b => b.id));
+    // Prune dead trails
+    for (const id of this._bulletTrails.keys()) {
+      if (!activeIds.has(id)) this._bulletTrails.delete(id);
+    }
+
     bullets.forEach(b => {
-      const c = typeof b.color === 'string' ? parseInt(b.color.replace('#','0x')) : (b.color||0xff4444);
-      // Outer glow
-      this._bulletGfx.fillStyle(c, 0.15);
-      this._bulletGfx.fillCircle(b.x, b.y, b.r * 2.5);
-      // Main
-      this._bulletGfx.fillStyle(c, 0.9);
-      this._bulletGfx.fillCircle(b.x, b.y, b.r);
-      // White hotspot
-      this._bulletGfx.fillStyle(0xffffff, 0.7);
-      this._bulletGfx.fillCircle(b.x - b.r*0.25, b.y - b.r*0.25, b.r * 0.35);
+      const c = typeof b.color === 'string' ? parseInt(b.color.replace('#', '0x')) : (b.color || 0xff4444);
+
+      // Update trail
+      if (!this._bulletTrails.has(b.id)) this._bulletTrails.set(b.id, []);
+      const trail = this._bulletTrails.get(b.id);
+      const last = trail[trail.length - 1];
+      if (!last || Math.abs(last.x - b.x) > 0.5 || Math.abs(last.y - b.y) > 0.5) {
+        trail.push({ x: b.x, y: b.y });
+        if (trail.length > 8) trail.shift();
+      }
+
+      // Draw trail (fading comet tail)
+      trail.forEach((pt, i) => {
+        const t = (i + 1) / trail.length;
+        gfx.fillStyle(c, t * 0.35);
+        gfx.fillCircle(pt.x, pt.y, b.r * t * 0.85);
+      });
+
+      if (b.type === 'dart') {
+        // Elongated dart: bright streak
+        gfx.fillStyle(c, 0.25);
+        gfx.fillCircle(b.x, b.y, b.r * 3);
+        gfx.fillStyle(0xffffff, 0.95);
+        gfx.fillCircle(b.x, b.y, b.r);
+        gfx.fillStyle(0xffffff, 0.5);
+        gfx.fillCircle(b.x, b.y, b.r * 0.4);
+      } else if (b.type === 'bomb') {
+        // Big pulsing orb with ring
+        gfx.lineStyle(3, c, 0.6);
+        gfx.strokeCircle(b.x, b.y, b.r * 1.6);
+        gfx.fillStyle(c, 0.2);
+        gfx.fillCircle(b.x, b.y, b.r * 1.6);
+        gfx.fillStyle(c, 0.95);
+        gfx.fillCircle(b.x, b.y, b.r);
+        gfx.fillStyle(0xffffff, 0.6);
+        gfx.fillCircle(b.x - b.r * 0.25, b.y - b.r * 0.25, b.r * 0.4);
+      } else {
+        // Standard orb
+        gfx.fillStyle(c, 0.18);
+        gfx.fillCircle(b.x, b.y, b.r * 2.3);
+        gfx.fillStyle(c, 1.0);
+        gfx.fillCircle(b.x, b.y, b.r);
+        gfx.fillStyle(0xffffff, 0.8);
+        gfx.fillCircle(b.x - b.r * 0.22, b.y - b.r * 0.22, b.r * 0.38);
+      }
     });
   }
 

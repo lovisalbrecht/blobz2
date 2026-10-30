@@ -278,9 +278,15 @@ function checkGameEnd(code) {
   if (!room) return;
 
   const alive = room.players.filter(p => p.alive);
-  if (alive.length > 1) return; // still going
+  const total = room.players.length;
 
-  endGame(code);
+  if (total <= 1) {
+    // Solo: play until you die
+    if (alive.length === 0) endGame(code);
+  } else {
+    // Multiplayer: last player standing wins
+    if (alive.length <= 1) endGame(code);
+  }
 }
 
 function endGame(code) {
@@ -330,7 +336,6 @@ function startBulletBarrage(code) {
   let bullets = [];
   const startTime = Date.now();
   let lastSpawn = 0;
-  let spawnInterval = 1200; // ms, decreases over time
 
   room.gameLoop = setInterval(() => {
     const room = rooms[code];
@@ -338,67 +343,76 @@ function startBulletBarrage(code) {
 
     const now = Date.now();
     const elapsed = now - startTime;
+    const ramp = Math.max(0, elapsed - 10000); // difficulty ramps after 10s
 
-    // Increase difficulty
-    spawnInterval = Math.max(300, 1200 - elapsed * 0.04);
+    // Spawn rate: very slow start (4s), ramps down to 500ms
+    const spawnInterval = Math.max(500, 4000 - ramp * 0.09);
 
-    // Spawn bullets
     if (now - lastSpawn > spawnInterval) {
       lastSpawn = now;
-      const count = elapsed > 20000 ? 2 : 1;
+      const count = elapsed > 60000 ? 3 : elapsed > 30000 ? (Math.random() < 0.5 ? 2 : 1) : 1;
       for (let i = 0; i < count; i++) {
         bullets.push(spawnBullet(bulletId++, elapsed));
       }
     }
 
-    // Move bullets
-    const dt = 0.05; // 50ms in seconds
+    const dt = 0.05;
     bullets.forEach(b => { b.x += b.vx * dt; b.y += b.vy * dt; });
+    bullets = bullets.filter(b => b.x > -80 && b.x < ARENA_W + 80 && b.y > -80 && b.y < ARENA_H + 80);
 
-    // Remove off-screen
-    bullets = bullets.filter(b => b.x > -60 && b.x < ARENA_W + 60 && b.y > -60 && b.y < ARENA_H + 60);
-
-    // Server-side collision check
+    // Tighter player hitbox for fairness
     const alive = room.players.filter(p => p.alive);
     alive.forEach(p => {
       bullets.forEach(b => {
         const dx = p.x - b.x, dy = p.y - b.y;
-        if (dx * dx + dy * dy < (16 + b.r) * (16 + b.r)) {
-          killPlayer(code, p.id);
-        }
+        if (dx * dx + dy * dy < (13 + b.r * 0.75) ** 2) killPlayer(code, p.id);
       });
     });
 
-    // Broadcast tick
     io.to(code).emit('game_tick', {
-      bullets: bullets.map(b => ({ id: b.id, x: b.x, y: b.y, r: b.r, color: b.color })),
+      bullets: bullets.map(b => ({ id: b.id, x: b.x, y: b.y, r: b.r, color: b.color, type: b.type })),
       players: room.players.map(p => ({ id: p.id, x: p.x, y: p.y, alive: p.alive })),
       elapsed,
     });
 
-    // Time limit
-    if (elapsed > 90000) endGame(code);
+    if (elapsed > 120000) endGame(code); // 2 min hard cap
   }, 50);
 }
 
 function spawnBullet(id, elapsed) {
   const side = Math.floor(Math.random() * 4);
-  const baseSpeed = 150 + Math.min(200, elapsed * 0.003);
-  const speed = baseSpeed + Math.random() * 80;
-  const r = 8 + Math.random() * 8;
+  const ramp = Math.max(0, elapsed - 10000);
+  const cappedSpeed = Math.min(280, 80 + ramp * 0.003);
 
-  const colors = ['#ff4444', '#ff8800', '#ffff00', '#44ffff', '#ff44ff'];
-  const color = colors[Math.floor(Math.random() * colors.length)];
-
-  let x, y, vx, vy;
-  switch (side) {
-    case 0: x = Math.random() * ARENA_W; y = -r; vx = (Math.random() - 0.5) * 80; vy = speed; break;
-    case 1: x = ARENA_W + r; y = Math.random() * ARENA_H; vx = -speed; vy = (Math.random() - 0.5) * 80; break;
-    case 2: x = Math.random() * ARENA_W; y = ARENA_H + r; vx = (Math.random() - 0.5) * 80; vy = -speed; break;
-    default: x = -r; y = Math.random() * ARENA_H; vx = speed; vy = (Math.random() - 0.5) * 80;
+  // Bullet type distribution changes over time
+  const rand = Math.random();
+  let type, r, speed;
+  if (elapsed > 40000 && rand < 0.25) {
+    type = 'dart'; r = 6; speed = cappedSpeed * 1.6 + Math.random() * 40;
+  } else if (elapsed > 20000 && rand < 0.2) {
+    type = 'bomb'; r = 18; speed = cappedSpeed * 0.55 + Math.random() * 20;
+  } else {
+    type = 'orb'; r = 10 + Math.random() * 6; speed = cappedSpeed + Math.random() * 35;
   }
 
-  return { id, x, y, vx, vy, r, color };
+  const COLOR_MAP = {
+    orb:  ['#ff4444', '#ff8800', '#44ffff', '#ff44ff', '#44ff88'],
+    dart: ['#ffffff', '#ffff44', '#eeeeff'],
+    bomb: ['#ff2200', '#cc0044', '#aa00ff'],
+  };
+  const palette = COLOR_MAP[type];
+  const color = palette[Math.floor(Math.random() * palette.length)];
+
+  const drift = (Math.random() - 0.5) * 50;
+  let x, y, vx, vy;
+  switch (side) {
+    case 0: x = Math.random() * ARENA_W; y = -r - 10; vx = drift; vy = speed; break;
+    case 1: x = ARENA_W + r + 10; y = Math.random() * ARENA_H; vx = -speed; vy = drift; break;
+    case 2: x = Math.random() * ARENA_W; y = ARENA_H + r + 10; vx = drift; vy = -speed; break;
+    default: x = -r - 10; y = Math.random() * ARENA_H; vx = speed; vy = drift;
+  }
+
+  return { id, x, y, vx, vy, r, color, type };
 }
 
 // ─── PENGUIN ATTACK ───────────────────────────────────────────────────────────
