@@ -426,6 +426,7 @@ class BulletBarrageScene extends ArenaScene {
   }
 
   _renderBullets(bullets) {
+    if (!this._bulletGfx) return;
     this._bulletGfx.clear();
     bullets.forEach(b => {
       const c = typeof b.color === 'string' ? parseInt(b.color.replace('#','0x')) : (b.color||0xff4444);
