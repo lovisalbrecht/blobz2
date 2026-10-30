@@ -10,15 +10,15 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #0d0d1e;
-  --card: #1a1a30;
-  --border: #2a2a45;
-  --accent: #7c3aed;
+  --bg: #1a0e05;
+  --card: #2d1a08;
+  --border: #5C3A1E;
+  --accent: #8B5E3C;
   --accent2: #f59e0b;
-  --text: #f0f0ff;
-  --sub: #8888aa;
+  --text: #fff8e7;
+  --sub: #c4a882;
   --red: #ef4444;
-  --green: #22c55e;
+  --green: #5a9e2f;
 }
 
 body {
@@ -35,19 +35,19 @@ body {
 h1.logo {
   font-family: 'Fredoka One', sans-serif;
   font-size: clamp(2.5rem, 8vw, 5rem);
-  background: linear-gradient(135deg, #7c3aed, #f59e0b, #ef4444);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  letter-spacing: 4px;
-  text-shadow: none;
+  color: #fff8e7;
+  -webkit-text-stroke: 3px #5C3A1E;
+  letter-spacing: 6px;
+  text-shadow: 0 4px 0 #3d1c00;
   margin-top: 0;
 }
 
 .tagline {
   color: var(--sub);
-  font-size: 0.9rem;
+  font-family: 'Fredoka One', sans-serif;
+  font-size: 0.95rem;
   margin-top: 4px;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
 }
 
 /* ── Screens ── */
@@ -69,20 +69,37 @@ h1.logo {
 .btn {
   display: block;
   width: 100%;
-  padding: 16px;
+  padding: 14px 16px;
   border: none;
-  border-radius: 14px;
+  border-radius: 10px;
   font-family: 'Fredoka One', sans-serif;
   font-size: 1.3rem;
   letter-spacing: 1px;
   cursor: pointer;
-  transition: transform 0.1s, box-shadow 0.1s;
+  transition: transform 0.1s, filter 0.1s;
 }
 .btn:active { transform: scale(0.97); }
-.btn-primary { background: var(--accent); color: #fff; box-shadow: 0 4px 20px #7c3aed66; }
-.btn-secondary { background: var(--card); color: var(--text); border: 2px solid var(--border); }
-.btn-danger { background: var(--red); color: #fff; }
-.btn-success { background: var(--green); color: #fff; box-shadow: 0 4px 20px #22c55e44; }
+/* Kenney-style buttons: solid color + bottom shadow border */
+.btn-primary {
+  background: #8B5E3C;
+  color: #fff8e7;
+  border-bottom: 4px solid #5C3A1E;
+  text-shadow: 0 1px 0 #3d1c00;
+}
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-secondary {
+  background: #3d2510;
+  color: var(--sub);
+  border: 2px solid var(--border);
+  border-bottom: 4px solid #1a0e05;
+}
+.btn-danger { background: #c0392b; color: #fff; border-bottom: 4px solid #8e1c14; }
+.btn-success {
+  background: #5a9e2f;
+  color: #fff8e7;
+  border-bottom: 4px solid #3d6e20;
+  text-shadow: 0 1px 0 #2a4a16;
+}
 
 /* ── Input ── */
 .field {
@@ -123,22 +140,32 @@ h1.logo {
 }
 .char-btn {
   aspect-ratio: 1;
-  border-radius: 12px;
-  background: var(--card);
+  border-radius: 10px;
+  background: #3d2510;
   border: 3px solid var(--border);
+  border-bottom: 5px solid #1a0e05;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 4px;
   cursor: pointer;
-  transition: border-color 0.15s, transform 0.1s;
+  transition: border-color 0.15s, transform 0.1s, filter 0.1s;
   padding: 8px;
 }
-.char-btn:active { transform: scale(0.95); }
-.char-btn.selected { border-color: var(--accent); background: #7c3aed22; }
+.char-btn:active { transform: scale(0.95) translateY(2px); border-bottom-width: 2px; }
+.char-btn.selected {
+  border-color: var(--accent2);
+  background: #4a3010;
+  box-shadow: 0 0 0 2px #f59e0b44;
+}
 .char-btn img { width: 52px; height: 104px; object-fit: contain; image-rendering: pixelated; }
-.char-btn .char-name { font-size: 0.65rem; color: var(--sub); text-align: center; }
+.char-btn .char-name {
+  font-size: 0.7rem;
+  font-family: 'Fredoka One', sans-serif;
+  color: var(--sub);
+  text-align: center;
+}
 
 /* ── Waiting room ── */
 .player-list {
@@ -148,8 +175,9 @@ h1.logo {
   gap: 8px;
 }
 .player-row {
-  background: var(--card);
+  background: #3d2510;
   border: 2px solid var(--border);
+  border-bottom: 4px solid #1a0e05;
   border-radius: 10px;
   padding: 10px 14px;
   display: flex;
@@ -168,26 +196,35 @@ h1.logo {
 .player-row .p-badge.host { background: var(--accent); color: #fff; }
 
 .room-code-display {
-  background: var(--card);
+  background: #3d2510;
   border: 2px solid var(--border);
-  border-radius: 14px;
+  border-bottom: 5px solid #1a0e05;
+  border-radius: 10px;
   padding: 16px 24px;
   text-align: center;
   width: 100%;
 }
-.room-code-display .code-label { font-size: 0.75rem; color: var(--sub); text-transform: uppercase; letter-spacing: 1px; }
+.room-code-display .code-label {
+  font-family: 'Fredoka One', sans-serif;
+  font-size: 0.8rem;
+  color: var(--sub);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
 .room-code-display .code-value {
   font-family: 'Fredoka One', sans-serif;
   font-size: 2.5rem;
   letter-spacing: 8px;
   color: var(--accent2);
+  text-shadow: 0 2px 0 #8B5E3C;
 }
 
 .section-title {
-  font-size: 0.75rem;
-  color: var(--sub);
+  font-family: 'Fredoka One', sans-serif;
+  font-size: 0.85rem;
+  color: var(--accent2);
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
   align-self: flex-start;
 }
 
