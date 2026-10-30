@@ -105,23 +105,27 @@ class ArenaScene extends Phaser.Scene {
     }
   }
 
-  // ── Draw arena background + Kenney brick border ───────────────────────────
+  // ── Draw arena = background + border ─────────────────────────────────────
   createArena() {
-    const W = gameData.arenaW, H = gameData.arenaH;
+    this._drawBackground();
+    this._drawBorder();
+  }
 
-    // Kenney landscape background
+  // Override in each scene for unique environment
+  _drawBackground() {
+    const W = gameData.arenaW, H = gameData.arenaH;
     const bg = this.add.image(W / 2, H / 2, 'bg_colored');
     bg.setDisplaySize(W, H);
-
-    // Slight dark overlay for readability
     this.add.rectangle(W / 2, H / 2, W, H, 0x0a1020, 0.42);
+  }
 
-    // Brick border using Kenney brickBrown tiles
+  // Kenney brick border — always on top of background
+  _drawBorder() {
+    const W = gameData.arenaW, H = gameData.arenaH;
     const TILE = 40;
     const hCount = Math.ceil(W / TILE);
     const vCount = Math.ceil(H / TILE);
     const hasTiles = this.textures.exists('tiles');
-
     const addBrick = (x, y) => {
       if (hasTiles) {
         this.add.image(x, y, 'tiles', 'brickBrown.png').setDisplaySize(TILE, TILE);
@@ -129,7 +133,6 @@ class ArenaScene extends Phaser.Scene {
         this.add.rectangle(x, y, TILE, TILE, 0x8B5E3C);
       }
     };
-
     for (let i = 0; i < hCount; i++) {
       addBrick(i * TILE + TILE / 2, TILE / 2);
       addBrick(i * TILE + TILE / 2, H - TILE / 2);
@@ -373,6 +376,97 @@ class ArenaScene extends Phaser.Scene {
 class BulletBarrageScene extends ArenaScene {
   constructor() { super({ key: 'BulletBarrage' }); }
 
+  // ── Night city background with stars, buildings and moving clouds ──────────
+  _drawBackground() {
+    const W = gameData.arenaW, H = gameData.arenaH;
+
+    // Night sky gradient
+    const sky = this.add.graphics();
+    const bands = 14;
+    for (let i = 0; i < bands; i++) {
+      const t = i / bands;
+      const r = Math.round(8 + t * 14);
+      const g = Math.round(5 + t * 12);
+      const b = Math.round(28 + t * 22);
+      sky.fillStyle((r << 16) | (g << 8) | b, 1);
+      sky.fillRect(0, i * (H / bands), W, Math.ceil(H / bands) + 1);
+    }
+
+    // Stars — fixed random dots
+    const starGfx = this.add.graphics();
+    for (let i = 0; i < 95; i++) {
+      const x = (i * 73 + 37) % W;
+      const y = (i * 47 + 13) % (H * 0.62);
+      const r = i % 6 === 0 ? 1.8 : 0.9;
+      starGfx.fillStyle(0xffffff, 0.5 + (i % 5) * 0.1);
+      starGfx.fillCircle(x, y, r);
+    }
+
+    // Moon (crescent)
+    const moon = this.add.graphics();
+    moon.fillStyle(0xfff0a0, 1);
+    moon.fillCircle(W - 72, 72, 38);
+    moon.fillStyle(0x080315, 1);
+    moon.fillCircle(W - 55, 60, 33);
+    // Moon glow ring
+    moon.lineStyle(12, 0xfff0a0, 0.06);
+    moon.strokeCircle(W - 72, 72, 52);
+
+    // City skyline silhouettes
+    const bldg = this.add.graphics();
+    const BLDGS = [
+      {x:-5,w:75,h:130},{x:55,w:45,h:90},{x:90,w:100,h:170},
+      {x:175,w:55,h:110},{x:220,w:115,h:205},{x:340,w:65,h:140},
+      {x:390,w:95,h:130},{x:470,w:50,h:165},{x:508,w:85,h:108},
+      {x:582,w:120,h:185},{x:692,w:60,h:132},{x:737,w:75,h:96},{x:790,w:65,h:148},
+    ];
+    BLDGS.forEach(b => {
+      bldg.fillStyle(0x0c1520, 1);
+      bldg.fillRect(b.x, H - b.h, b.w, b.h);
+      // Lit windows (seeded pseudo-random)
+      bldg.fillStyle(0xffdd66, 0.7);
+      let seed = b.x;
+      for (let wy = H - b.h + 12; wy < H - 20; wy += 18) {
+        for (let wx = b.x + 8; wx < b.x + b.w - 8; wx += 13) {
+          seed = (seed * 9301 + 49297) % 233280;
+          if (seed / 233280 > 0.45) bldg.fillRect(wx, wy, 5, 7);
+        }
+      }
+      // Antenna with red light
+      bldg.fillStyle(0x0e1b28, 1);
+      bldg.fillRect(b.x + b.w / 2 - 2, H - b.h - 16, 4, 16);
+      bldg.fillStyle(0xff3333, 0.85);
+      bldg.fillCircle(b.x + b.w / 2, H - b.h - 16, 2.5);
+    });
+
+    // Street / ground
+    const road = this.add.graphics();
+    road.fillStyle(0x0f1e2e, 1);
+    road.fillRect(0, H - 42, W, 42);
+    road.lineStyle(2, 0x192f44, 1);
+    road.strokeRect(0, H - 42, W, 42);
+    road.lineStyle(2, 0x2a4a66, 0.4);
+    road.beginPath();
+    road.moveTo(0, H - 21); road.lineTo(W, H - 21);
+    road.strokePath();
+
+    // Moving clouds — dark, fits night sky
+    this._clouds = [];
+    const cloudY = [48, 85, 62, 100];
+    for (let i = 0; i < 4; i++) {
+      const cloud = this.add.graphics();
+      const size = 60 + i * 18;
+      cloud.fillStyle(0x1e2d3e, 1);
+      cloud.fillEllipse(0, 0, size, size * 0.38);
+      cloud.fillEllipse(-size * 0.28, size * 0.1, size * 0.55, size * 0.32);
+      cloud.fillEllipse(size * 0.26, size * 0.06, size * 0.62, size * 0.35);
+      const startX = (i * 180) % (W + 100) - 60;
+      cloud.setPosition(startX, cloudY[i]);
+      cloud.setAlpha(0.6 + i * 0.08);
+      this._clouds.push({ gfx: cloud, speed: 14 + i * 8 });
+    }
+  }
+
   create() {
     this.createArena();
     this.createHUD();
@@ -537,7 +631,16 @@ class BulletBarrageScene extends ArenaScene {
     this._bulletSprites.clear();
   }
 
-  update(_, delta) { this.updateMyPosition(delta); }
+  update(_, delta) {
+    this.updateMyPosition(delta);
+    if (this._clouds) {
+      const dt = delta / 1000;
+      this._clouds.forEach(c => {
+        c.gfx.x += c.speed * dt;
+        if (c.gfx.x > gameData.arenaW + 130) c.gfx.x = -130;
+      });
+    }
+  }
 }
 
 // ─── PENGUIN ATTACK ───────────────────────────────────────────────────────────
@@ -547,10 +650,106 @@ class PenguinAttackScene extends ArenaScene {
 
   preload() {
     super.preload();
-    // Load enemy sprites if available
     if (!this.textures.exists('enemies')) {
       this.load.atlas('enemies', '/assets/enemies/spritesheet_enemies.png', '/assets/enemies/spritesheet_enemies.xml');
     }
+  }
+
+  // ── Arctic environment with mountains, aurora, snowflakes ─────────────────
+  _drawBackground() {
+    const W = gameData.arenaW, H = gameData.arenaH;
+
+    // Arctic sky — pale blue gradient
+    const sky = this.add.graphics();
+    for (let i = 0; i < 12; i++) {
+      const t = i / 12;
+      const r = Math.round(148 + t * 88);
+      const g = Math.round(202 + t * 40);
+      const b = Math.round(235 + t * 18);
+      sky.fillStyle((r << 16) | (g << 8) | b, 1);
+      sky.fillRect(0, i * (H / 12), W, Math.ceil(H / 12) + 1);
+    }
+
+    // Aurora borealis (subtle wavey lines)
+    const aurora = this.add.graphics();
+    const aurCols = [0x40ee80, 0x00ccaa, 0x50ddff, 0x90eebb];
+    for (let i = 0; i < 4; i++) {
+      aurora.lineStyle(4 + i * 3, aurCols[i], 0.07 + i * 0.015);
+      aurora.beginPath();
+      aurora.moveTo(0, 55 + i * 16);
+      for (let x = 0; x <= W; x += 28) {
+        aurora.lineTo(x, 55 + i * 16 + Math.sin(x * 0.017 + i * 1.3) * 22);
+      }
+      aurora.strokePath();
+    }
+
+    // Snowy mountains (back to front)
+    const mtn = this.add.graphics();
+    const MTNS = [
+      {pts:[[0,H-110],[110,H-335],[225,H-110]], col:0xaacce0},
+      {pts:[[165,H-95],[295,H-310],[425,H-95]],  col:0xb8d8f0},
+      {pts:[[360,H-105],[488,H-295],[620,H-105]], col:0xc0dff5},
+      {pts:[[555,H-95],[685,H-275],[825,H-95]],   col:0xb5d5eb},
+    ];
+    MTNS.forEach(m => {
+      mtn.fillStyle(m.col, 1);
+      mtn.beginPath();
+      mtn.moveTo(m.pts[0][0], H - 32);
+      m.pts.forEach(p => mtn.lineTo(p[0], p[1]));
+      mtn.lineTo(m.pts[2][0], H - 32);
+      mtn.closePath(); mtn.fillPath();
+      // Snow cap
+      const [p0, p1, p2] = m.pts;
+      mtn.fillStyle(0xffffff, 0.9);
+      mtn.fillTriangle(
+        p0[0] + (p2[0]-p0[0])*0.33, p1[1]+52,
+        p1[0], p1[1]-6,
+        p0[0] + (p2[0]-p0[0])*0.67, p1[1]+52,
+      );
+    });
+
+    // Icy ground
+    const ground = this.add.graphics();
+    ground.fillStyle(0xe0f0fa, 1);
+    ground.fillRect(0, H - 35, W, 35);
+    ground.fillStyle(0xc4e2f5, 0.8);
+    ground.fillRect(0, H - 35, W, 8);
+    // Ice surface cracks
+    ground.lineStyle(1, 0x88c0d8, 0.5);
+    ground.beginPath();
+    for (let x = 20; x < W; x += 50) {
+      ground.moveTo(x, H - 35); ground.lineTo(x + 16, H - 18); ground.lineTo(x + 8, H);
+    }
+    ground.strokePath();
+
+    // Snowflake pool (updated in update loop)
+    this._snowflakes = [];
+    this._snowGfx = this.add.graphics().setDepth(6);
+    for (let i = 0; i < 60; i++) {
+      this._snowflakes.push({
+        x: (i * 87 + 23) % W, y: (i * 53 + 11) % H,
+        speed: 22 + (i % 8) * 8,
+        drift: ((i % 5) - 2) * 10,
+        r: 1.2 + (i % 4) * 0.4,
+        wobble: i * 0.4,
+      });
+    }
+  }
+
+  _updateSnow(delta) {
+    if (!this._snowGfx) return;
+    const dt = delta / 1000;
+    const W = gameData.arenaW, H = gameData.arenaH;
+    this._snowGfx.clear();
+    this._snowflakes.forEach(s => {
+      s.y += s.speed * dt;
+      s.wobble += dt * 1.8;
+      s.x += Math.sin(s.wobble) * s.drift * dt;
+      if (s.y > H + 5) { s.y = -5; s.x = Math.random() * W; }
+      if (s.x < -5) s.x = W; if (s.x > W + 5) s.x = 0;
+      this._snowGfx.fillStyle(0xffffff, 0.7 + Math.random() * 0.3);
+      this._snowGfx.fillCircle(s.x, s.y, s.r);
+    });
   }
 
   create() {
@@ -562,9 +761,9 @@ class PenguinAttackScene extends ArenaScene {
     this._penguinGfx = this.add.graphics().setDepth(3);
     this._penguins = [];
 
-    // Lane dividers - subtle dark lines
+    // Lane dividers — icy light blue lines
     const g = this.add.graphics();
-    g.lineStyle(2, 0x3d2010, 0.4);
+    g.lineStyle(2, 0x7ab8d8, 0.35);
     for (let i = 0; i < 4; i++) {
       const y = 80 + i * 120;
       g.moveTo(40, y - 45); g.lineTo(gameData.arenaW - 40, y - 45);
@@ -635,13 +834,78 @@ class PenguinAttackScene extends ArenaScene {
     g.fillEllipse(x + 10, y + 30, 14, 6);
   }
 
-  update(_, delta) { this.updateMyPosition(delta); }
+  update(_, delta) {
+    this.updateMyPosition(delta);
+    this._updateSnow(delta);
+  }
 }
 
 // ─── MAGMA MADNESS ────────────────────────────────────────────────────────────
 
 class MagmaMadnessScene extends ArenaScene {
   constructor() { super({ key: 'MagmaMadness' }); }
+
+  // ── Underground cave with stalactites + lava glow ─────────────────────────
+  _drawBackground() {
+    const W = gameData.arenaW, H = gameData.arenaH;
+
+    // Deep cave darkness
+    this.add.rectangle(W / 2, H / 2, W, H, 0x0a0500, 1);
+
+    // Cave ceiling texture
+    const ceil = this.add.graphics();
+    ceil.fillStyle(0x180b04, 1);
+    ceil.fillRect(0, 0, W, 44);
+    ceil.fillStyle(0x281408, 0.7);
+    let seed = 7;
+    for (let x = 8; x < W; x += 22) {
+      seed = (seed * 1664525 + 1013904223) & 0x7fffffff;
+      const cw = 14 + (seed % 18);
+      const ch = 6 + (seed % 15);
+      ceil.fillRect(x, 0, cw, ch);
+    }
+
+    // Side rock walls (visible between tile border and edge)
+    const walls = this.add.graphics();
+    walls.fillStyle(0x1c0e06, 1);
+    walls.fillRect(0, 0, 42, H);
+    walls.fillRect(W - 42, 0, 42, H);
+    walls.fillStyle(0x2e1a0a, 0.65);
+    for (let y = 0; y < H; y += 24) {
+      seed = (seed * 1664525 + 1013904223) & 0x7fffffff;
+      const jl = (seed % 10);
+      walls.fillRect(0, y, 30 + jl, 22);
+      walls.fillRect(W - 30 - jl, y, 30 + jl, 22);
+    }
+
+    // Lava glow rising from below
+    const glow = this.add.graphics();
+    glow.fillStyle(0xff5500, 0.06);
+    glow.fillRect(0, H - 95, W, 95);
+    glow.fillStyle(0xff8800, 0.035);
+    glow.fillRect(0, H - 48, W, 48);
+
+    // Stalactites hanging from ceiling — depth 10 so they render OVER the tile grid
+    const stal = this.add.graphics().setDepth(10);
+    seed = 31;
+    let sx = 52;
+    while (sx < W - 52) {
+      seed = (seed * 1664525 + 1013904223) & 0x7fffffff;
+      const sh = 20 + (seed % 40);
+      const sw = 7 + (seed % 9);
+      // Main body
+      stal.fillStyle(0x3d2010, 1);
+      stal.fillTriangle(sx - sw, 40, sx + sw, 40, sx, 40 + sh);
+      // Light highlight strip
+      stal.fillStyle(0x6a3a1e, 0.55);
+      stal.fillTriangle(sx - sw * 0.45, 40, sx + sw * 0.25, 40, sx, 40 + sh * 0.42);
+      // Dark tip
+      stal.fillStyle(0x1e0e04, 0.8);
+      stal.fillTriangle(sx - sw * 0.3, 40 + sh * 0.7, sx + sw * 0.3, 40 + sh * 0.7, sx, 40 + sh);
+      seed = (seed * 1664525 + 1013904223) & 0x7fffffff;
+      sx += 26 + (seed % 36);
+    }
+  }
 
   create() {
     this.COLS = 16; this.ROWS = 11;

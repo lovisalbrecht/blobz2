@@ -167,6 +167,81 @@ h1.logo {
   text-align: center;
 }
 
+/* ── Char stage (Fortnite-style lobby preview) ── */
+.char-stage {
+  width: 100%;
+  background: linear-gradient(to bottom, #1a0e05 0%, #2a1408 60%, #3d2010 100%);
+  border: 2px solid var(--border);
+  border-bottom: 5px solid #1a0e05;
+  border-radius: 12px;
+  padding: 12px 10px 0;
+  min-height: 100px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 16px;
+  position: relative;
+  overflow: hidden;
+}
+/* Stage floor line */
+.char-stage::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 10px;
+  background: #5C3A1E;
+  border-top: 2px solid #8B5E3C;
+}
+/* Spotlights */
+.char-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60px 80px at 20% 0%, rgba(255,220,80,0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 60px 80px at 80% 0%, rgba(255,220,80,0.06) 0%, transparent 70%),
+    radial-gradient(ellipse 50px 70px at 50% 0%, rgba(255,200,60,0.04) 0%, transparent 70%);
+  pointer-events: none;
+}
+.stage-char {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding-bottom: 10px;
+  animation: stageBounce 0.45s ease-in-out infinite alternate;
+  position: relative;
+  z-index: 1;
+}
+.stage-char:nth-child(2) { animation-delay: 0.09s; }
+.stage-char:nth-child(3) { animation-delay: 0.18s; }
+.stage-char:nth-child(4) { animation-delay: 0.27s; }
+.stage-char:nth-child(5) { animation-delay: 0.36s; }
+.stage-char img {
+  width: 34px;
+  height: 68px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.stage-char-name {
+  font-family: 'Fredoka One', sans-serif;
+  font-size: 0.65rem;
+  color: var(--accent2);
+  text-align: center;
+  white-space: nowrap;
+}
+@keyframes stageBounce {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-12px); }
+}
+.stage-empty {
+  font-family: 'Fredoka One', sans-serif;
+  font-size: 0.85rem;
+  color: var(--sub);
+  padding-bottom: 20px;
+  opacity: 0.6;
+}
+
 /* ── Waiting room ── */
 .player-list {
   width: 100%;
@@ -328,7 +403,11 @@ h1.logo {
     <div class="code-label">Raumcode — teile ihn mit deinen Freunden</div>
     <div class="code-value" id="display-code">----</div>
   </div>
-  <p class="section-title">Spieler</p>
+  <!-- Fortnite-style character lobby stage -->
+  <div class="char-stage" id="char-stage">
+    <span class="stage-empty">Warte auf Spieler…</span>
+  </div>
+  <p class="section-title">Spieler im Raum</p>
   <div class="player-list" id="player-list"></div>
   <p class="hint" id="waiting-hint">Warte auf mehr Spieler…</p>
   <button class="btn btn-success" id="start-btn" onclick="startGame()" style="display:none;">
@@ -505,6 +584,39 @@ function renderPlayerList(players) {
     `;
     list.appendChild(row);
   });
+  renderCharStage(players);
+}
+
+// ── Fortnite-style character lobby stage ─────────────────────────────────────
+let _stageWalkFrame = 0;
+let _stageAnimInterval = null;
+
+function renderCharStage(players) {
+  const stage = document.getElementById('char-stage');
+  if (!stage) return;
+  if (!players || players.length === 0) {
+    stage.innerHTML = '<span class="stage-empty">Warte auf Spieler…</span>';
+    return;
+  }
+  stage.innerHTML = '';
+  players.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'stage-char';
+    el.innerHTML = `
+      <img data-char="${p.char}" src="/assets/chars/alien${p.char}_walk1.png" alt="${p.name}">
+      <span class="stage-char-name">${p.name}</span>
+    `;
+    stage.appendChild(el);
+  });
+  if (!_stageAnimInterval) {
+    _stageAnimInterval = setInterval(() => {
+      _stageWalkFrame = 1 - _stageWalkFrame;
+      document.querySelectorAll('.stage-char img[data-char]').forEach(img => {
+        const ch = img.dataset.char;
+        img.src = `/assets/chars/alien${ch}_walk${_stageWalkFrame + 1}.png`;
+      });
+    }, 280);
+  }
 }
 
 function startGame() {
