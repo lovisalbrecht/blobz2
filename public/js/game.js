@@ -83,7 +83,7 @@ class ArenaScene extends Phaser.Scene {
     this._moveInterval = null;
   }
 
-  // ── Preload: load all char sprites ──────────────────────────────────────────
+  // ── Preload: load all char sprites + atlases ────────────────────────────────
   preload() {
     const colors = ['Blue', 'Pink', 'Yellow', 'Green', 'Beige'];
     const poses = ['front', 'walk1', 'walk2', 'stand', 'hit', 'jump', 'duck'];
@@ -94,37 +94,50 @@ class ArenaScene extends Phaser.Scene {
       }
     }));
 
-    if (!this.textures.exists('bg_land')) {
-      this.load.image('bg_land', '/assets/bg/blue_land.png');
+    if (!this.textures.exists('bg_colored')) {
+      this.load.image('bg_colored', '/assets/bg/colored_land.png');
+    }
+    if (!this.textures.exists('tiles')) {
+      this.load.atlasXML('tiles', '/assets/tiles/spritesheet_tiles.png', '/assets/tiles/spritesheet_tiles.xml');
+    }
+    if (!this.textures.exists('items')) {
+      this.load.atlasXML('items', '/assets/items/spritesheet_items.png', '/assets/items/spritesheet_items.xml');
     }
   }
 
-  // ── Draw arena background with tiles ──────────────────────────────────────
+  // ── Draw arena background + Kenney brick border ───────────────────────────
   createArena() {
     const W = gameData.arenaW, H = gameData.arenaH;
 
-    // Dark blue arena
-    this.add.rectangle(W / 2, H / 2, W, H, 0x0a1628);
+    // Kenney landscape background
+    const bg = this.add.image(W / 2, H / 2, 'bg_colored');
+    bg.setDisplaySize(W, H);
 
-    // Subtle grid
-    const g = this.add.graphics();
-    g.lineStyle(1, 0x1a3050, 0.6);
-    for (let x = 0; x <= W; x += 50) { g.moveTo(x, 0); g.lineTo(x, H); }
-    for (let y = 0; y <= H; y += 50) { g.moveTo(0, y); g.lineTo(W, y); }
-    g.strokePath();
+    // Slight dark overlay for readability
+    this.add.rectangle(W / 2, H / 2, W, H, 0x0a1020, 0.42);
 
-    // Arena border
-    const border = this.add.graphics();
-    border.lineStyle(4, 0x3b82f6, 0.5);
-    border.strokeRect(2, 2, W - 4, H - 4);
-    // Corner markers
-    border.lineStyle(4, 0x60a5fa, 0.9);
-    const cs = 20;
-    [[2, 2], [W-2, 2], [W-2, H-2], [2, H-2]].forEach(([cx, cy]) => {
-      const sx = cx === 2 ? 1 : -1, sy = cy === 2 ? 1 : -1;
-      border.moveTo(cx, cy + sy * cs); border.lineTo(cx, cy); border.lineTo(cx + sx * cs, cy);
-    });
-    border.strokePath();
+    // Brick border using Kenney brickBrown tiles
+    const TILE = 40;
+    const hCount = Math.ceil(W / TILE);
+    const vCount = Math.ceil(H / TILE);
+    const hasTiles = this.textures.exists('tiles');
+
+    const addBrick = (x, y) => {
+      if (hasTiles) {
+        this.add.image(x, y, 'tiles', 'brickBrown.png').setDisplaySize(TILE, TILE);
+      } else {
+        this.add.rectangle(x, y, TILE, TILE, 0x8B5E3C);
+      }
+    };
+
+    for (let i = 0; i < hCount; i++) {
+      addBrick(i * TILE + TILE / 2, TILE / 2);
+      addBrick(i * TILE + TILE / 2, H - TILE / 2);
+    }
+    for (let j = 1; j < vCount - 1; j++) {
+      addBrick(TILE / 2, j * TILE + TILE / 2);
+      addBrick(W - TILE / 2, j * TILE + TILE / 2);
+    }
   }
 
   // ── Create player sprites ──────────────────────────────────────────────────
@@ -193,14 +206,19 @@ class ArenaScene extends Phaser.Scene {
   // ── HUD ───────────────────────────────────────────────────────────────────
   createHUD() {
     const W = gameData.arenaW;
-    this.add.rectangle(W / 2, 18, W, 36, 0x000000, 0.6).setDepth(10);
+    // Kenney-style wooden HUD bar
+    this.add.rectangle(W / 2, 20, W, 40, 0x5C3A1E, 1).setDepth(10);
+    this.add.rectangle(W / 2, 20, W - 4, 36, 0x8B5E3C, 1).setDepth(10);
+    this.add.rectangle(W / 2, 40, W, 2, 0x3d2010, 1).setDepth(10);
 
-    this.timerText = this.add.text(W / 2, 18, '0:00', {
-      fontSize: '16px', fontFamily: 'Fredoka One, sans-serif', color: '#e0e0ff',
+    this.timerText = this.add.text(W / 2, 20, '0:00', {
+      fontSize: '18px', fontFamily: 'Fredoka One, sans-serif',
+      color: '#fff8e7', stroke: '#3d1c00', strokeThickness: 3,
     }).setOrigin(0.5, 0.5).setDepth(11);
 
-    this.aliveText = this.add.text(W - 12, 18, '👥 1', {
-      fontSize: '13px', fontFamily: 'Nunito, sans-serif', color: '#8899bb',
+    this.aliveText = this.add.text(W - 14, 20, '♥ 1', {
+      fontSize: '14px', fontFamily: 'Fredoka One, sans-serif',
+      color: '#ffd080', stroke: '#3d1c00', strokeThickness: 2,
     }).setOrigin(1, 0.5).setDepth(11);
   }
 
@@ -208,7 +226,7 @@ class ArenaScene extends Phaser.Scene {
     if (!this.timerText) return;
     const secs = Math.floor(elapsed / 1000);
     this.timerText.setText(`${Math.floor(secs/60)}:${(secs%60).toString().padStart(2,'0')}`);
-    if (this.aliveText) this.aliveText.setText(`👥 ${aliveCount}`);
+    if (this.aliveText) this.aliveText.setText(`♥ ${aliveCount}`);
   }
 
   // ── Input ─────────────────────────────────────────────────────────────────
@@ -361,22 +379,28 @@ class BulletBarrageScene extends ArenaScene {
     this.createPlayers();
     this.setupInput();
 
-    this._bulletGfx = this.add.graphics().setDepth(3);
+    this._trailGfx = this.add.graphics().setDepth(3);
     this._bullets = [];
     this._bulletTrails = new Map();
+    this._bulletSprites = new Map(); // id → { img, rotSpeed }
 
-    // Title
-    const title = this.add.text(gameData.arenaW/2, gameData.arenaH/2 - 30, 'BULLET BARRAGE', {
-      fontSize: '40px', fontFamily: 'Fredoka One, sans-serif',
-      color: '#f59e0b', stroke: '#000', strokeThickness: 6,
-    }).setOrigin(0.5).setDepth(20).setAlpha(0);
-    const sub = this.add.text(gameData.arenaW/2, gameData.arenaH/2 + 24, 'Weiche den Kugeln aus!', {
-      fontSize: '18px', fontFamily: 'Nunito, sans-serif', color: '#e0e0ff',
-    }).setOrigin(0.5).setDepth(20).setAlpha(0);
+    // Kenney-style sign banner
+    const W = gameData.arenaW, H = gameData.arenaH;
+    const banner = this.add.rectangle(W/2, H/2 - 20, 420, 78, 0x5C3A1E, 1).setDepth(20).setAlpha(0);
+    const bannerInner = this.add.rectangle(W/2, H/2 - 20, 412, 70, 0x8B5E3C, 1).setDepth(20).setAlpha(0);
+    const title = this.add.text(W/2, H/2 - 28, 'BULLET BARRAGE', {
+      fontSize: '34px', fontFamily: 'Fredoka One, sans-serif',
+      color: '#fff8e7', stroke: '#3d1c00', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(21).setAlpha(0);
+    const sub = this.add.text(W/2, H/2 + 10, 'Weiche den Edelsteinen aus!', {
+      fontSize: '15px', fontFamily: 'Fredoka One, sans-serif',
+      color: '#ffd080', stroke: '#3d1c00', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(21).setAlpha(0);
 
-    this.tweens.add({ targets: [title, sub], alpha: 1, duration: 300 });
+    const allTitleObjs = [banner, bannerInner, title, sub];
+    this.tweens.add({ targets: allTitleObjs, alpha: 1, duration: 300 });
     this.time.delayedCall(2200, () => {
-      this.tweens.add({ targets: [title, sub], alpha: 0, duration: 400, onComplete: () => { title.destroy(); sub.destroy(); } });
+      this.tweens.add({ targets: allTitleObjs, alpha: 0, duration: 400, onComplete: () => allTitleObjs.forEach(o => o.destroy()) });
     });
 
     if (gameData.myId === 'solo') this._startSolo();
@@ -384,7 +408,7 @@ class BulletBarrageScene extends ArenaScene {
 
   _startSolo() {
     this._soloStart = Date.now();
-    this._lastSpawn = 0;
+    this._lastSpawn = Date.now(); // prevent immediate spawn
     this.time.addEvent({ delay: 50, loop: true, callback: this._soloTick, callbackScope: this });
   }
 
@@ -433,7 +457,7 @@ class BulletBarrageScene extends ArenaScene {
     }
 
     this.updateHUD(elapsed, this.myAlive ? 1 : 0);
-    this._renderBullets(this._bullets);
+    this._syncBullets(this._bullets);
   }
 
   onTick(data) {
@@ -441,67 +465,76 @@ class BulletBarrageScene extends ArenaScene {
     this.updateOtherPlayers(data.players);
     const alive = data.players ? data.players.filter(p => p.alive).length : 0;
     this.updateHUD(data.elapsed, alive);
-    this._renderBullets(this._bullets);
+    this._syncBullets(this._bullets);
   }
 
-  _renderBullets(bullets) {
-    if (!this._bulletGfx) return;
-    const gfx = this._bulletGfx;
-    gfx.clear();
+  _getBulletTex(b) {
+    if (b.type === 'dart') return 'gemYellow.png';
+    if (b.type === 'bomb') return 'gemRed.png';
+    const c = b.color || '';
+    if (c === '#44ffff' || c === '#44ff88') return 'gemBlue.png';
+    if (c === '#ff4444' || c === '#ff44ff' || c === '#ff2200') return 'gemRed.png';
+    if (c === '#ff8800') return 'gemYellow.png';
+    return 'gemGreen.png';
+  }
 
+  _syncBullets(bullets) {
+    if (!this._trailGfx) return;
+    const gfx = this._trailGfx;
     const activeIds = new Set(bullets.map(b => b.id));
-    // Prune dead trails
+
+    // Remove stale sprites and trails
+    for (const [id, data] of this._bulletSprites) {
+      if (!activeIds.has(id)) { data.img.destroy(); this._bulletSprites.delete(id); }
+    }
     for (const id of this._bulletTrails.keys()) {
       if (!activeIds.has(id)) this._bulletTrails.delete(id);
     }
 
-    bullets.forEach(b => {
-      const c = typeof b.color === 'string' ? parseInt(b.color.replace('#', '0x')) : (b.color || 0xff4444);
+    gfx.clear();
 
-      // Update trail
+    const hasItems = this.textures.exists('items');
+    bullets.forEach(b => {
+      // Trail
       if (!this._bulletTrails.has(b.id)) this._bulletTrails.set(b.id, []);
       const trail = this._bulletTrails.get(b.id);
       const last = trail[trail.length - 1];
       if (!last || Math.abs(last.x - b.x) > 0.5 || Math.abs(last.y - b.y) > 0.5) {
         trail.push({ x: b.x, y: b.y });
-        if (trail.length > 8) trail.shift();
+        if (trail.length > 6) trail.shift();
       }
-
-      // Draw trail (fading comet tail)
+      // Draw trail as small fading squares (pixel art style, no glow)
+      const c = typeof b.color === 'string' ? parseInt(b.color.replace('#', '0x')) : (b.color || 0x44ffff);
       trail.forEach((pt, i) => {
         const t = (i + 1) / trail.length;
-        gfx.fillStyle(c, t * 0.35);
-        gfx.fillCircle(pt.x, pt.y, b.r * t * 0.85);
+        const sz = b.r * t * 0.55;
+        gfx.fillStyle(c, t * 0.45);
+        gfx.fillRect(pt.x - sz, pt.y - sz, sz * 2, sz * 2);
       });
 
-      if (b.type === 'dart') {
-        // Elongated dart: bright streak
-        gfx.fillStyle(c, 0.25);
-        gfx.fillCircle(b.x, b.y, b.r * 3);
-        gfx.fillStyle(0xffffff, 0.95);
-        gfx.fillCircle(b.x, b.y, b.r);
-        gfx.fillStyle(0xffffff, 0.5);
-        gfx.fillCircle(b.x, b.y, b.r * 0.4);
-      } else if (b.type === 'bomb') {
-        // Big pulsing orb with ring
-        gfx.lineStyle(3, c, 0.6);
-        gfx.strokeCircle(b.x, b.y, b.r * 1.6);
-        gfx.fillStyle(c, 0.2);
-        gfx.fillCircle(b.x, b.y, b.r * 1.6);
-        gfx.fillStyle(c, 0.95);
-        gfx.fillCircle(b.x, b.y, b.r);
-        gfx.fillStyle(0xffffff, 0.6);
-        gfx.fillCircle(b.x - b.r * 0.25, b.y - b.r * 0.25, b.r * 0.4);
+      // Gem sprite
+      if (!this._bulletSprites.has(b.id)) {
+        const frame = hasItems ? this._getBulletTex(b) : null;
+        const img = frame
+          ? this.add.image(b.x, b.y, 'items', frame).setDepth(4)
+          : this.add.circle(b.x, b.y, b.r, c).setDepth(4);
+        const size = Math.max(32, b.r * 3.2);
+        img.setDisplaySize(size, size);
+        img.setPixelPerfect = true;
+        const rotSpeed = b.type === 'bomb' ? 0.8 : b.type === 'dart' ? 3.5 : 1.5 + Math.random();
+        this._bulletSprites.set(b.id, { img, rotSpeed });
       } else {
-        // Standard orb
-        gfx.fillStyle(c, 0.18);
-        gfx.fillCircle(b.x, b.y, b.r * 2.3);
-        gfx.fillStyle(c, 1.0);
-        gfx.fillCircle(b.x, b.y, b.r);
-        gfx.fillStyle(0xffffff, 0.8);
-        gfx.fillCircle(b.x - b.r * 0.22, b.y - b.r * 0.22, b.r * 0.38);
+        const data = this._bulletSprites.get(b.id);
+        data.img.setPosition(b.x, b.y);
+        data.img.angle += data.rotSpeed;
       }
     });
+  }
+
+  shutdown() {
+    super.shutdown();
+    for (const data of this._bulletSprites.values()) data.img.destroy();
+    this._bulletSprites.clear();
   }
 
   update(_, delta) { this.updateMyPosition(delta); }
@@ -529,22 +562,30 @@ class PenguinAttackScene extends ArenaScene {
     this._penguinGfx = this.add.graphics().setDepth(3);
     this._penguins = [];
 
-    // Lane markers
+    // Lane dividers - subtle dark lines
     const g = this.add.graphics();
-    g.lineStyle(1, 0x1a4060, 0.5);
+    g.lineStyle(2, 0x3d2010, 0.4);
     for (let i = 0; i < 4; i++) {
       const y = 80 + i * 120;
-      g.moveTo(0, y - 45); g.lineTo(gameData.arenaW, y - 45);
+      g.moveTo(40, y - 45); g.lineTo(gameData.arenaW - 40, y - 45);
     }
     g.strokePath();
 
-    const title = this.add.text(gameData.arenaW/2, gameData.arenaH/2, '🐧 PINGUIN-ATTACKE', {
-      fontSize: '32px', fontFamily: 'Fredoka One, sans-serif',
-      color: '#60cdff', stroke: '#000', strokeThickness: 5,
-    }).setOrigin(0.5).setDepth(20);
+    const W = gameData.arenaW, H = gameData.arenaH;
+    const banner = this.add.rectangle(W/2, H/2, 400, 78, 0x5C3A1E, 1).setDepth(20);
+    const bannerInner = this.add.rectangle(W/2, H/2, 392, 70, 0x8B5E3C, 1).setDepth(20);
+    const title = this.add.text(W/2, H/2 - 12, 'PINGUIN-ATTACKE', {
+      fontSize: '34px', fontFamily: 'Fredoka One, sans-serif',
+      color: '#fff8e7', stroke: '#3d1c00', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(21);
+    const sub = this.add.text(W/2, H/2 + 20, 'Weiche den Pinguinen aus!', {
+      fontSize: '15px', fontFamily: 'Fredoka One, sans-serif',
+      color: '#ffd080', stroke: '#3d1c00', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(21);
 
+    const objs = [banner, bannerInner, title, sub];
     this.time.delayedCall(2200, () => {
-      this.tweens.add({ targets: title, alpha: 0, duration: 400, onComplete: () => title.destroy() });
+      this.tweens.add({ targets: objs, alpha: 0, duration: 400, onComplete: () => objs.forEach(o => o.destroy()) });
     });
   }
 
@@ -607,15 +648,24 @@ class MagmaMadnessScene extends ArenaScene {
     this._tiles = null;
     this._tileGfx = this.add.graphics().setDepth(1);
     this._t = 0;
+    this.createArena();
     this.createHUD();
 
-    const title = this.add.text(gameData.arenaW/2, gameData.arenaH/2, '🌋 MAGMA MADNESS', {
-      fontSize: '32px', fontFamily: 'Fredoka One, sans-serif',
-      color: '#ff6600', stroke: '#000', strokeThickness: 5,
-    }).setOrigin(0.5).setDepth(20);
+    const W = gameData.arenaW, H = gameData.arenaH;
+    const banner = this.add.rectangle(W/2, H/2, 380, 78, 0x5C3A1E, 1).setDepth(20);
+    const bannerInner = this.add.rectangle(W/2, H/2, 372, 70, 0x8B5E3C, 1).setDepth(20);
+    const title = this.add.text(W/2, H/2 - 12, 'MAGMA MADNESS', {
+      fontSize: '34px', fontFamily: 'Fredoka One, sans-serif',
+      color: '#fff8e7', stroke: '#3d1c00', strokeThickness: 4,
+    }).setOrigin(0.5).setDepth(21);
+    const sub = this.add.text(W/2, H/2 + 20, 'Falle nicht in die Lava!', {
+      fontSize: '15px', fontFamily: 'Fredoka One, sans-serif',
+      color: '#ffd080', stroke: '#3d1c00', strokeThickness: 2,
+    }).setOrigin(0.5).setDepth(21);
 
+    const objs = [banner, bannerInner, title, sub];
     this.time.delayedCall(2200, () => {
-      this.tweens.add({ targets: title, alpha: 0, duration: 400, onComplete: () => { title.destroy(); this.createPlayers(); this.setupInput(); } });
+      this.tweens.add({ targets: objs, alpha: 0, duration: 400, onComplete: () => { objs.forEach(o => o.destroy()); this.createPlayers(); this.setupInput(); } });
     });
   }
 
@@ -642,25 +692,30 @@ class MagmaMadnessScene extends ArenaScene {
         const x = c * tW + 1, y = r * tH + 1, w = tW - 2, h = tH - 2;
 
         if (solid) {
-          // Stone tile with highlights
-          this._tileGfx.fillStyle(0x3d5a3d, 1);
+          // Kenney brickBrown style: tan base + highlight top-left + shadow bottom-right
+          this._tileGfx.fillStyle(0x9B7540, 1);
           this._tileGfx.fillRect(x, y, w, h);
-          this._tileGfx.fillStyle(0x4a6e4a, 1);
+          this._tileGfx.fillStyle(0xB8924E, 1);
           this._tileGfx.fillRect(x, y, w, 3);
           this._tileGfx.fillRect(x, y, 3, h);
-          this._tileGfx.fillStyle(0x2a3d2a, 1);
+          this._tileGfx.fillStyle(0x7A5C32, 1);
           this._tileGfx.fillRect(x, y + h - 3, w, 3);
           this._tileGfx.fillRect(x + w - 3, y, 3, h);
+          // Mortar lines
+          this._tileGfx.fillStyle(0x5C3A1E, 0.6);
+          this._tileGfx.fillRect(x, y, w, 1);
+          this._tileGfx.fillRect(x, y, 1, h);
         } else {
-          // Lava - animated
+          // Lava - animated orange/red
           const wave = Math.sin(this._t * 0.003 + c * 0.4 + r * 0.6);
-          const alpha = 0.8 + wave * 0.2;
-          this._tileGfx.fillStyle(0xcc2200, alpha);
+          this._tileGfx.fillStyle(0xCC3300, 1);
           this._tileGfx.fillRect(x, y, w, h);
-          this._tileGfx.fillStyle(0xff5500, 0.5 + wave * 0.3);
-          this._tileGfx.fillEllipse(x + w/2, y + h/2, w * 0.7, h * 0.5);
-          this._tileGfx.fillStyle(0xffaa00, 0.2 + Math.max(0, wave) * 0.3);
-          this._tileGfx.fillCircle(x + w/2, y + h * 0.3, h * 0.2);
+          this._tileGfx.fillStyle(0xFF5500, 0.55 + wave * 0.2);
+          this._tileGfx.fillEllipse(x + w/2, y + h/2 + 2, w * 0.65, h * 0.5);
+          this._tileGfx.fillStyle(0xFF8800, 0.4 + Math.max(0, wave) * 0.35);
+          this._tileGfx.fillEllipse(x + w/2, y + h * 0.35, w * 0.4, h * 0.3);
+          this._tileGfx.fillStyle(0xFFCC00, 0.15 + Math.max(0, wave) * 0.2);
+          this._tileGfx.fillCircle(x + w/2, y + h * 0.25, h * 0.15);
         }
       }
     }
