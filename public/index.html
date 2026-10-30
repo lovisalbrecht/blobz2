@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>BLOBZ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #0d0d1e;
+  --card: #1a1a30;
+  --border: #2a2a45;
+  --accent: #7c3aed;
+  --accent2: #f59e0b;
+  --text: #f0f0ff;
+  --sub: #8888aa;
+  --red: #ef4444;
+  --green: #22c55e;
+}
+
+body {
+  font-family: 'Nunito', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+}
+
+h1.logo {
+  font-family: 'Fredoka One', sans-serif;
+  font-size: clamp(2.5rem, 8vw, 5rem);
+  background: linear-gradient(135deg, #7c3aed, #f59e0b, #ef4444);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: 4px;
+  text-shadow: none;
+  margin-top: 0;
+}
+
+.tagline {
+  color: var(--sub);
+  font-size: 0.9rem;
+  margin-top: 4px;
+  letter-spacing: 1px;
+}
+
+/* ── Screens ── */
+.screen {
+  display: none;
+  width: 100%;
+  max-width: 480px;
+  padding: 16px;
+}
+.screen.active { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+
+/* ── Home screen ── */
+#screen-home {
+  gap: 24px;
+  padding-top: 48px;
+}
+.home-logo { text-align: center; }
+
+.btn {
+  display: block;
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-radius: 14px;
+  font-family: 'Fredoka One', sans-serif;
+  font-size: 1.3rem;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: var(--accent); color: #fff; box-shadow: 0 4px 20px #7c3aed66; }
+.btn-secondary { background: var(--card); color: var(--text); border: 2px solid var(--border); }
+.btn-danger { background: var(--red); color: #fff; }
+.btn-success { background: var(--green); color: #fff; box-shadow: 0 4px 20px #22c55e44; }
+
+/* ── Input ── */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+.field label { font-size: 0.8rem; color: var(--sub); text-transform: uppercase; letter-spacing: 1px; }
+.field input {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--text);
+  font-family: 'Nunito', sans-serif;
+  font-size: 1rem;
+  font-weight: 700;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+.field input:focus { border-color: var(--accent); }
+.field input.code-input {
+  font-family: 'Fredoka One', sans-serif;
+  font-size: 2rem;
+  letter-spacing: 8px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* ── Character selection ── */
+.char-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+.char-btn {
+  aspect-ratio: 1;
+  border-radius: 12px;
+  background: var(--card);
+  border: 3px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+  padding: 8px;
+}
+.char-btn:active { transform: scale(0.95); }
+.char-btn.selected { border-color: var(--accent); background: #7c3aed22; }
+.char-btn img { width: 52px; height: 104px; object-fit: contain; image-rendering: pixelated; }
+.char-btn .char-name { font-size: 0.65rem; color: var(--sub); text-align: center; }
+
+/* ── Waiting room ── */
+.player-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.player-row {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.player-row .p-emoji { font-size: 1.4rem; }
+.player-row .p-name { font-weight: 800; flex: 1; }
+.player-row .p-badge {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--border);
+  color: var(--sub);
+}
+.player-row .p-badge.host { background: var(--accent); color: #fff; }
+
+.room-code-display {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 24px;
+  text-align: center;
+  width: 100%;
+}
+.room-code-display .code-label { font-size: 0.75rem; color: var(--sub); text-transform: uppercase; letter-spacing: 1px; }
+.room-code-display .code-value {
+  font-family: 'Fredoka One', sans-serif;
+  font-size: 2.5rem;
+  letter-spacing: 8px;
+  color: var(--accent2);
+}
+
+.section-title {
+  font-size: 0.75rem;
+  color: var(--sub);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  align-self: flex-start;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--sub);
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.9rem;
+  cursor: pointer;
+  align-self: flex-start;
+  padding: 0;
+}
+.back-btn:hover { color: var(--text); }
+
+.error-msg {
+  background: #ef444422;
+  border: 1px solid var(--red);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: var(--red);
+  font-size: 0.9rem;
+  width: 100%;
+  text-align: center;
+  display: none;
+}
+.error-msg.show { display: block; }
+
+.hint {
+  color: var(--sub);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+/* ── Starting countdown ── */
+.countdown-big {
+  font-family: 'Fredoka One', sans-serif;
+  font-size: 5rem;
+  color: var(--accent2);
+  text-align: center;
+  animation: pulse 0.5s ease infinite alternate;
+}
+@keyframes pulse { from { transform: scale(1); } to { transform: scale(1.05); } }
+
+/* ── Particles bg ── */
+.bg-particles {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  overflow: hidden;
+}
+.particle {
+  position: absolute;
+  border-radius: 50%;
+  animation: float linear infinite;
+  opacity: 0.15;
+}
+@keyframes float {
+  from { transform: translateY(110vh) rotate(0deg); }
+  to { transform: translateY(-10vh) rotate(720deg); }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-particles" id="particles"></div>
+
+<!-- HOME -->
+<div class="screen active" id="screen-home">
+  <div class="home-logo">
+    <h1 class="logo">BLOBZ</h1>
+    <p class="tagline">Party Mini-Games · Multiplayer</p>
+  </div>
+  <div style="width:100%;display:flex;flex-direction:column;gap:12px;">
+    <button class="btn btn-primary" onclick="showCreate()">Spiel erstellen</button>
+    <button class="btn btn-secondary" onclick="showJoin()">Code eingeben</button>
+  </div>
+</div>
+
+<!-- CREATE / JOIN (share char-select flow) -->
+<div class="screen" id="screen-setup">
+  <button class="back-btn" id="setup-back">← Zurück</button>
+  <div class="field">
+    <label>Dein Name</label>
+    <input type="text" id="input-name" maxlength="16" placeholder="z.B. Alex" autocomplete="off">
+  </div>
+  <div id="join-code-field" class="field" style="display:none;">
+    <label>Raumcode</label>
+    <input type="text" id="input-code" class="code-input" maxlength="4" placeholder="ABCD" autocomplete="off" spellcheck="false">
+  </div>
+  <p class="section-title">Charakter wählen</p>
+  <div class="char-grid" id="char-grid"></div>
+  <div class="error-msg" id="setup-error"></div>
+  <button class="btn btn-primary" id="setup-go-btn" onclick="doSetup()">Weiter</button>
+</div>
+
+<!-- WAITING ROOM -->
+<div class="screen" id="screen-waiting">
+  <div class="room-code-display">
+    <div class="code-label">Raumcode — teile ihn mit deinen Freunden</div>
+    <div class="code-value" id="display-code">----</div>
+  </div>
+  <p class="section-title">Spieler</p>
+  <div class="player-list" id="player-list"></div>
+  <p class="hint" id="waiting-hint">Warte auf mehr Spieler…</p>
+  <button class="btn btn-success" id="start-btn" onclick="startGame()" style="display:none;">
+    Spiel starten ▶
+  </button>
+</div>
+
+<!-- STARTING -->
+<div class="screen" id="screen-starting">
+  <h2 style="font-family:'Fredoka One';font-size:1.8rem;color:var(--sub);">Spiel startet</h2>
+  <div class="countdown-big" id="countdown">3</div>
+  <p class="hint">Mach dich bereit!</p>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+// ── Characters ─────────────────────────────────────────────────────────────
+const CHARS = [
+  { id: 'Blue',    name: 'Blobby',  color: '#5b9bd5' },
+  { id: 'Pink',    name: 'Pinky',   color: '#e07aaa' },
+  { id: 'Yellow',  name: 'Sunny',   color: '#f5c842' },
+  { id: 'Green',   name: 'Goo',     color: '#5abf6a' },
+  { id: 'Beige',   name: 'Astro',   color: '#d4c89a' },
+];
+
+// ── State ──────────────────────────────────────────────────────────────────
+let socket = null;
+let myId = null;
+let myCode = null;
+let myChar = 'skeletti';
+let isCreating = true;
+let hostId = null;
+
+// ── Background particles ───────────────────────────────────────────────────
+(function() {
+  const container = document.getElementById('particles');
+  for (let i = 0; i < 15; i++) {
+    const el = document.createElement('div');
+    el.className = 'particle';
+    const size = 6 + Math.random() * 20;
+    const colors = ['#7c3aed','#f59e0b','#ef4444','#22c55e','#3b82f6'];
+    el.style.cssText = `
+      width:${size}px;height:${size}px;
+      left:${Math.random()*100}%;
+      background:${colors[Math.floor(Math.random()*colors.length)]};
+      animation-duration:${6+Math.random()*10}s;
+      animation-delay:${-Math.random()*10}s;
+    `;
+    container.appendChild(el);
+  }
+})();
+
+// ── Build char grid ────────────────────────────────────────────────────────
+function buildCharGrid() {
+  const grid = document.getElementById('char-grid');
+  grid.innerHTML = '';
+  CHARS.forEach(c => {
+    const btn = document.createElement('div');
+    btn.className = 'char-btn' + (c.id === myChar ? ' selected' : '');
+    btn.innerHTML = `<img src="/assets/chars/alien${c.id}_front.png" alt="${c.name}"><span class="char-name">${c.name}</span>`;
+    btn.onclick = () => selectChar(c.id);
+    grid.appendChild(btn);
+  });
+}
+
+function selectChar(id) {
+  myChar = id;
+  document.querySelectorAll('.char-btn').forEach((btn, i) => {
+    btn.classList.toggle('selected', CHARS[i].id === id);
+  });
+  if (socket) socket.emit('set_char', { char: id });
+}
+
+// ── Screen nav ─────────────────────────────────────────────────────────────
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showCreate() {
+  isCreating = true;
+  document.getElementById('join-code-field').style.display = 'none';
+  document.getElementById('setup-go-btn').textContent = 'Raum erstellen →';
+  document.getElementById('setup-back').onclick = () => showScreen('screen-home');
+  document.getElementById('setup-error').classList.remove('show');
+  buildCharGrid();
+  showScreen('screen-setup');
+}
+
+function showJoin() {
+  isCreating = false;
+  document.getElementById('join-code-field').style.display = 'flex';
+  document.getElementById('setup-go-btn').textContent = 'Beitreten →';
+  document.getElementById('setup-back').onclick = () => showScreen('screen-home');
+  document.getElementById('setup-error').classList.remove('show');
+  buildCharGrid();
+  showScreen('screen-setup');
+}
+
+function showError(msg) {
+  const el = document.getElementById('setup-error');
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+// ── Connect & setup ────────────────────────────────────────────────────────
+function doSetup() {
+  const name = document.getElementById('input-name').value.trim() || 'Blob';
+  const code = document.getElementById('input-code').value.trim().toUpperCase();
+
+  if (!socket) {
+    socket = io();
+    setupSocketEvents();
+  }
+
+  if (isCreating) {
+    socket.emit('create_room', { name, char: myChar });
+  } else {
+    if (!code || code.length !== 4) { showError('Bitte gib einen 4-stelligen Code ein.'); return; }
+    socket.emit('join_room', { code, name, char: myChar });
+  }
+}
+
+function setupSocketEvents() {
+  socket.on('joined', ({ code, playerId, hostId: hId }) => {
+    myId = playerId;
+    myCode = code;
+    hostId = hId;
+    document.getElementById('display-code').textContent = code;
+    showScreen('screen-waiting');
+  });
+
+  socket.on('error', (msg) => {
+    showError(msg);
+  });
+
+  socket.on('lobby_update', ({ players, hostId: hId, state }) => {
+    hostId = hId;
+    renderPlayerList(players);
+
+    const startBtn = document.getElementById('start-btn');
+    const hint = document.getElementById('waiting-hint');
+
+    if (myId === hId) {
+      startBtn.style.display = players.length >= 1 ? 'block' : 'none';
+      hint.textContent = players.length === 1 ? 'Warte auf Mitspieler oder starte alleine.' : '';
+    } else {
+      startBtn.style.display = 'none';
+      hint.textContent = 'Warte, bis der Host das Spiel startet…';
+    }
+
+    if (state === 'starting') {
+      showCountdown();
+    }
+  });
+
+  socket.on('game_start', (data) => {
+    // Save data and navigate to game.html
+    sessionStorage.setItem('blobz_game', JSON.stringify({ myId, code: myCode, ...data }));
+    window.location.href = '/game.html';
+  });
+}
+
+function renderPlayerList(players) {
+  const list = document.getElementById('player-list');
+  list.innerHTML = '';
+  players.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'player-row';
+    row.innerHTML = `
+      <img src="/assets/chars/alien${p.char}_front.png" style="width:28px;height:56px;object-fit:contain;image-rendering:pixelated;" alt="">
+      <span class="p-name">${p.name}</span>
+      ${p.id === hostId ? '<span class="p-badge host">Host</span>' : '<span class="p-badge">Spieler</span>'}
+    `;
+    list.appendChild(row);
+  });
+}
+
+function startGame() {
+  if (socket) socket.emit('start_game');
+}
+
+function showCountdown() {
+  showScreen('screen-starting');
+  let n = 3;
+  document.getElementById('countdown').textContent = n;
+  const t = setInterval(() => {
+    n--;
+    if (n <= 0) { clearInterval(t); return; }
+    document.getElementById('countdown').textContent = n;
+  }, 1000);
+}
+
+// ── Code input formatting ──────────────────────────────────────────────────
+document.getElementById('input-code').addEventListener('input', function() {
+  this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+});
+</script>
+</body>
+</html>
